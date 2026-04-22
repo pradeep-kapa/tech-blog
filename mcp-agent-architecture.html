@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>MCP and Agentic AI Architecture — Pradeep Kapa</title>
+<meta name="description" content="A production engineer's guide to Model Context Protocol — from first principles to production on EKS with Cilium, IRSA, ArgoCD, and observability."/>
+<meta name="author" content="Pradeep Kapa"/>
+<meta property="og:title" content="MCP and Agentic AI: A Production Engineer's Guide"/>
+<meta property="og:description" content="From first principles to EKS deployment — the complete architecture of secure, production-grade AI agents."/>
+<meta property="og:type" content="article"/>
+<meta property="og:url" content="https://pradeep-kapa.github.io/blog/mcp-agent-architecture"/>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=JetBrains+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;1,400&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --ink: #0f0f14;
+  --ink2: #3a3a4a;
+  --ink3: #7a7a8a;
+  --surface: #faf9f6;
+  --surface2: #f2f0ea;
+  --surface3: #e8e5dc;
+  --surface4: #dddad0;
+  --accent: #1a1aff;
+  --accent2: #00a877;
+  --accent3: #e03b2a;
+  --accent4: #7c3aed;
+  --amber: #b45309;
+  --mono: 'JetBrains Mono', monospace;
+  --serif: 'Lora', Georgia, serif;
+  --sans: 'Instrument Sans', sans-serif;
+  --display: 'Syne', sans-serif;
+  --max: 740px;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: var(--serif); background: var(--surface); color: var(--ink); line-height: 1.8; font-size: 18px; }
+
+/* ── NAV ── */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,249,246,0.94); backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--surface3);
+  padding: 0 2rem; height: 52px;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+}
+.nav-home { font-family: var(--display); font-weight: 800; font-size: 14px; color: var(--ink); text-decoration: none; letter-spacing: -0.02em; flex-shrink: 0; }
+.nav-links { display: flex; gap: 1.25rem; align-items: center; }
+.nav-links a { font-family: var(--mono); font-size: 11px; color: var(--ink3); text-decoration: none; letter-spacing: 0.05em; transition: color 0.2s; white-space: nowrap; }
+.nav-links a:hover { color: var(--ink); }
+.nav-tags { display: flex; gap: 6px; }
+.ntag { font-family: var(--mono); font-size: 9px; padding: 3px 9px; border-radius: 100px; font-weight: 500; letter-spacing: 0.06em; }
+.ntag.b { color: var(--accent); background: rgba(26,26,255,0.07); border: 1px solid rgba(26,26,255,0.2); }
+.ntag.g { color: var(--accent2); background: rgba(0,168,119,0.07); border: 1px solid rgba(0,168,119,0.2); }
+.ntag.p { color: var(--accent4); background: rgba(124,58,237,0.07); border: 1px solid rgba(124,58,237,0.2); }
+
+/* ── HERO ── */
+.hero { max-width: 860px; margin: 0 auto; padding: 5rem 2rem 3rem; border-bottom: 1px solid var(--surface3); }
+.hero-meta { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
+.badge { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 11px; border-radius: 100px; }
+.badge.series { color: var(--accent2); background: rgba(0,168,119,0.08); border: 1px solid rgba(0,168,119,0.25); }
+.badge.part   { color: var(--ink3); border: 1px solid var(--surface3); }
+.badge.time   { color: var(--ink3); }
+.hero h1 {
+  font-family: var(--display); font-weight: 800;
+  font-size: clamp(2rem, 4.5vw, 3.2rem);
+  line-height: 1.08; letter-spacing: -0.03em;
+  color: var(--ink); margin-bottom: 1.1rem;
+}
+.hero-sub { font-family: var(--sans); font-size: 1.05rem; color: var(--ink2); line-height: 1.65; max-width: 640px; margin-bottom: 1.75rem; }
+.author-row { display: flex; align-items: center; gap: 12px; padding-top: 1.5rem; border-top: 1px solid var(--surface3); }
+.avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--ink); display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 800; font-size: 13px; color: white; flex-shrink: 0; }
+.author-name { font-family: var(--sans); font-weight: 500; font-size: 14px; color: var(--ink); }
+.author-sub  { font-family: var(--mono); font-size: 10px; color: var(--ink3); margin-top: 2px; }
+.author-sub a { color: var(--accent); text-decoration: none; }
+.author-sub a:hover { text-decoration: underline; }
+
+/* ── LAYOUT ── */
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 2rem 6rem; }
+.sec { margin: 3.5rem 0; }
+.sec-label {
+  font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent2); font-weight: 500;
+  margin-bottom: 0.6rem; display: flex; align-items: center; gap: 10px;
+}
+.sec-label::after { content: ''; flex: 1; height: 1px; background: var(--surface3); }
+.sec-num { color: var(--ink3); font-size: 9px; }
+
+/* ── TYPOGRAPHY ── */
+h2 { font-family: var(--display); font-size: 1.55rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 0.9rem; margin-top: 2.5rem; line-height: 1.2; }
+h2:first-child { margin-top: 0; }
+h3 { font-family: var(--sans); font-weight: 500; font-size: 1rem; color: var(--ink); margin: 2rem 0 0.6rem; }
+h4 { font-family: var(--mono); font-size: 0.78rem; color: var(--ink3); letter-spacing: 0.08em; text-transform: uppercase; margin: 1.5rem 0 0.4rem; }
+p { color: var(--ink2); margin-bottom: 1.25rem; font-size: 0.96rem; line-height: 1.78; }
+p:last-child { margin-bottom: 0; }
+article > p:first-child { color: var(--ink); font-size: 1rem; }
+strong { color: var(--ink); font-weight: 600; }
+em { font-style: italic; }
+a { color: var(--accent); text-decoration: underline; text-decoration-color: rgba(26,26,255,0.3); }
+a:hover { text-decoration-color: var(--accent); }
+ul, ol { margin: 0.5rem 0 1.25rem 1.25rem; color: var(--ink2); }
+li { margin-bottom: 0.35rem; font-size: 0.94rem; line-height: 1.7; }
+hr { border: none; border-top: 1px solid var(--surface3); margin: 3rem 0; }
+
+/* ── PULL QUOTE ── */
+.pullquote { border-left: 3px solid var(--accent2); padding: 0.9rem 1.4rem; margin: 2rem 0; background: rgba(0,168,119,0.04); border-radius: 0 8px 8px 0; }
+.pullquote p { font-size: 1.05rem; color: var(--ink); font-style: italic; line-height: 1.65; }
+
+/* ── CALLOUTS ── */
+.callout { border-radius: 10px; padding: 1.1rem 1.4rem; margin: 1.5rem 0; border: 1px solid; }
+.callout.warn  { background: rgba(224,59,42,0.04);  border-color: rgba(224,59,42,0.2);  border-left: 3px solid var(--accent3); }
+.callout.tip   { background: rgba(0,168,119,0.04);  border-color: rgba(0,168,119,0.2);  border-left: 3px solid var(--accent2); }
+.callout.info  { background: rgba(26,26,255,0.04);  border-color: rgba(26,26,255,0.2);  border-left: 3px solid var(--accent); }
+.callout.key   { background: rgba(124,58,237,0.04); border-color: rgba(124,58,237,0.2); border-left: 3px solid var(--accent4); }
+.callout b { display: block; margin-bottom: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; font-family: var(--mono); }
+.callout.warn b { color: var(--accent3); }
+.callout.tip  b { color: var(--accent2); }
+.callout.info b { color: var(--accent); }
+.callout.key  b { color: var(--accent4); }
+.callout p { font-family: var(--sans); font-size: 0.9rem; color: var(--ink2); }
+
+/* ── COMPARE TABLE ── */
+.compare-wrap { overflow-x: auto; margin: 1.5rem 0; }
+table.compare { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.compare th { background: var(--surface2); color: var(--ink); font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; padding: 10px 14px; text-align: left; border: 1px solid var(--surface3); }
+.compare td { padding: 10px 14px; border: 1px solid var(--surface3); color: var(--ink2); vertical-align: top; line-height: 1.55; }
+.compare tr:nth-child(even) td { background: rgba(242,240,234,0.5); }
+.yes { color: var(--accent2); font-weight: 600; font-family: var(--sans); }
+.no  { color: var(--accent3); font-family: var(--sans); }
+
+/* ── LAYER CARDS ── */
+.layers { display: flex; flex-direction: column; gap: 1px; border: 1px solid var(--surface3); border-radius: 12px; overflow: hidden; margin: 1.5rem 0; }
+.layer { background: white; padding: 1.4rem 1.6rem; display: grid; grid-template-columns: 120px 1fr; gap: 1.5rem; align-items: start; }
+.layer:not(:last-child) { border-bottom: 1px solid var(--surface3); }
+.layer-badge { display: flex; flex-direction: column; gap: 2px; }
+.layer-num { font-family: var(--display); font-weight: 800; font-size: 2.2rem; line-height: 1; letter-spacing: -0.04em; }
+.layer-num.l1 { color: var(--accent2); }
+.layer-num.l2 { color: var(--accent); }
+.layer-num.l3 { color: var(--accent4); }
+.layer-lbl { font-family: var(--mono); font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; }
+.layer-lbl.l1 { color: var(--accent2); }
+.layer-lbl.l2 { color: var(--accent); }
+.layer-lbl.l3 { color: var(--accent4); }
+.layer-title { font-family: var(--sans); font-weight: 500; font-size: 0.94rem; color: var(--ink); margin-bottom: 4px; }
+.layer-desc { font-family: var(--sans); font-size: 0.84rem; color: var(--ink2); line-height: 1.6; margin-bottom: 8px; }
+.layer-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.ltag { font-family: var(--mono); font-size: 9px; color: var(--ink3); border: 1px solid var(--surface3); padding: 2px 7px; border-radius: 4px; }
+
+/* ── DIAGRAM CARDS ── */
+.diagram-card { border: 1px solid var(--surface3); border-radius: 12px; overflow: hidden; margin: 1.5rem 0; }
+.diagram-head { background: var(--surface2); border-bottom: 1px solid var(--surface3); padding: 8px 14px; display: flex; align-items: center; gap: 6px; }
+.dot { width: 9px; height: 9px; border-radius: 50%; }
+.diagram-title { font-family: var(--mono); font-size: 11px; color: var(--ink3); margin-left: 4px; }
+.diagram-body { padding: 24px 16px; background: white; display: flex; justify-content: center; overflow-x: auto; }
+.mermaid { width: 100%; max-width: 700px; }
+
+/* ── CODE ── */
+.code-wrap { border: 1px solid var(--surface3); border-radius: 10px; overflow: hidden; margin: 1.5rem 0; }
+.code-head { background: var(--surface2); border-bottom: 1px solid var(--surface3); padding: 7px 14px; display: flex; justify-content: space-between; align-items: center; }
+.lang  { font-family: var(--mono); font-size: 10px; font-weight: 600; color: var(--accent); text-transform: uppercase; letter-spacing: 0.08em; }
+.fname { font-family: var(--mono); font-size: 10px; color: var(--ink3); }
+pre { background: #1a1b26; padding: 1.25rem 1.4rem; overflow-x: auto; font-family: var(--mono); font-size: 0.78rem; line-height: 1.65; color: #cdd6f4; }
+code { font-family: var(--mono); font-size: 0.8rem; background: var(--surface2); color: var(--accent4); padding: 2px 5px; border-radius: 4px; }
+pre code { background: none; padding: 0; color: #cdd6f4; font-size: inherit; }
+/* syntax */
+.kw  { color: #cba6f7; } /* keywords — lavender */
+.fn  { color: #89b4fa; } /* functions — blue */
+.st  { color: #a6e3a1; } /* strings — green */
+.cm  { color: #6c7086; font-style: italic; } /* comments — overlay */
+.nm  { color: #89dceb; } /* names/types — sky */
+.dec { color: #a6e3a1; } /* decorators — green */
+.op  { color: #7f849c; } /* operators — subtle */
+.num { color: #fab387; } /* numbers — peach */
+.tp  { color: #f9e2af; } /* types/special — yellow */
+
+/* ── SEQUENCE ── */
+.seq { background: white; border: 1px solid var(--surface3); border-radius: 12px; overflow: hidden; margin: 1.5rem 0; }
+.seq-head { background: var(--surface2); border-bottom: 1px solid var(--surface3); padding: 9px 18px; font-family: var(--mono); font-size: 10px; color: var(--ink3); letter-spacing: 0.1em; text-transform: uppercase; }
+.seq-step { display: grid; grid-template-columns: 28px 120px 1fr; gap: 12px; align-items: start; padding: 11px 18px; border-bottom: 1px solid var(--surface3); }
+.seq-step:last-child { border-bottom: none; }
+.sn   { font-family: var(--mono); font-size: 10px; color: var(--accent2); font-weight: 500; padding-top: 1px; }
+.sfrom{ font-family: var(--mono); font-size: 10px; color: var(--accent); padding-top: 1px; }
+.swhat{ font-family: var(--sans); font-size: 0.85rem; color: var(--ink2); line-height: 1.55; }
+.swhat code { font-size: 0.75rem; }
+
+/* ── SECURITY GATES ── */
+.gates { display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 12px; margin: 1.5rem 0; }
+.gate { background: white; border: 1px solid var(--surface3); border-top: 3px solid var(--accent); border-radius: 10px; padding: 16px; transition: transform 0.2s, border-top-color 0.2s; }
+.gate:hover { transform: translateY(-2px); border-top-color: var(--accent2); }
+.gate-n  { font-family: var(--display); font-size: 1.6rem; font-weight: 800; color: var(--accent); margin-bottom: 4px; line-height: 1; }
+.gate-t  { font-family: var(--sans); font-weight: 500; font-size: 0.87rem; color: var(--ink); margin-bottom: 3px; }
+.gate-d  { font-family: var(--sans); font-size: 0.77rem; color: var(--ink3); line-height: 1.5; }
+
+/* ── WINS GRID ── */
+.wins { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 1.5rem 0; }
+.win { background: white; border: 1px solid var(--surface3); border-radius: 10px; padding: 14px 16px; display: flex; gap: 10px; align-items: flex-start; }
+.win-ic { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+.win-tx { font-family: var(--sans); font-size: 0.82rem; color: var(--ink2); line-height: 1.5; }
+.win-tx strong { display: block; margin-bottom: 2px; font-size: 0.87rem; color: var(--ink); }
+
+/* ── CTA ── */
+.cta { background: var(--ink); border-radius: 14px; padding: 2rem 2.25rem; margin: 2.5rem 0; display: flex; justify-content: space-between; align-items: center; gap: 1.5rem; }
+.cta-lbl   { font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.4); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 5px; }
+.cta-title { font-family: var(--display); font-size: 1.05rem; font-weight: 700; color: white; margin-bottom: 4px; }
+.cta-desc  { font-family: var(--sans); font-size: 0.82rem; color: rgba(255,255,255,0.55); line-height: 1.55; }
+.cta-btn   { font-family: var(--mono); font-size: 11px; color: var(--accent2); border: 1px solid rgba(0,168,119,0.4); padding: 9px 18px; border-radius: 100px; text-decoration: none; white-space: nowrap; flex-shrink: 0; transition: background 0.2s; }
+.cta-btn:hover { background: rgba(0,168,119,0.12); }
+
+/* ── FOOTER ── */
+.article-footer { max-width: var(--max); margin: 0 auto; padding: 2rem 2rem 4rem; border-top: 1px solid var(--surface3); }
+footer { max-width: var(--max); margin: 0 auto; padding: 0 2rem 3rem; text-align: center; }
+footer p { font-family: var(--sans); font-size: 0.8rem; color: var(--ink3); line-height: 1.6; }
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); font-size: 11px; color: var(--ink3); text-decoration: none; margin-top: 1.25rem; }
+.back-link:hover { color: var(--ink); }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 640px) {
+  nav { padding: 0 1.25rem; }
+  .nav-tags { display: none; }
+  .nav-links a:not(:last-child) { display: none; }
+  .hero { padding: 3rem 1.25rem 2rem; }
+  .wrap { padding: 0 1.25rem 4rem; }
+  .layer { grid-template-columns: 1fr; gap: 0.5rem; }
+  .layer-badge { flex-direction: row; align-items: center; gap: 8px; }
+  .layer-num { font-size: 1.5rem; }
+  .seq-step { grid-template-columns: 22px 1fr; }
+  .sfrom { display: none; }
+  .cta { flex-direction: column; align-items: flex-start; }
+  body { font-size: 16px; }
+  h2 { font-size: 1.35rem; }
+}
+@media (min-width: 641px) and (max-width: 1024px) {
+  .wrap { max-width: 680px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="https://pradeep-kapa.github.io" class="nav-home">PK · Blog</a>
+  <div class="nav-links">
+    <a href="https://pradeep-kapa.github.io">Portfolio</a>
+    <a href="https://pradeep-kapa.github.io/#projects">Projects</a>
+    <a href="https://github.com/pradeep-kapa" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+  <div class="nav-tags">
+    <span class="ntag b">MCP</span>
+    <span class="ntag g">EKS</span>
+    <span class="ntag p">Agentic AI</span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header class="hero">
+  <div class="hero-meta">
+    <span class="badge series">AI Infrastructure Series</span>
+    <span class="badge part">Part 1 of 2</span>
+    <span class="badge time">20 min read</span>
+  </div>
+  <h1>MCP and Agentic AI: Building and Deploying Secure Agent Systems</h1>
+  <p class="hero-sub">From first principles to production — what Model Context Protocol is, why agentic systems fail without it, how to implement one, and how to run it on EKS with Cilium, IRSA, ArgoCD, and full observability.</p>
+  <div class="author-row">
+    <div class="avatar">PK</div>
+    <div>
+      <div class="author-name">Pradeep Kapa</div>
+      <div class="author-sub">
+        Senior Software Engineer · Cloud · SRE · AI Platforms &nbsp;·&nbsp;
+        <a href="https://www.linkedin.com/in/pradeepkapa" target="_blank" rel="noopener">LinkedIn</a> &nbsp;·&nbsp;
+        <a href="https://github.com/pradeep-kapa" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ARTICLE BODY -->
+<div class="wrap">
+<article>
+
+<!-- ══════════════════════════ 01 WHAT IS MCP ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">01</span> First Principles</div>
+  <h2>What Is Model Context Protocol — and Why Does It Exist?</h2>
+
+  <p>Before we talk about MCP, we need to be honest about what happens when you give an LLM access to your systems without it.</p>
+
+  <p>Most AI agent demos show the happy path: the agent receives a question, calls a tool, returns an answer. What they don't show is the architecture underneath — usually a raw database connection string passed directly to the model, a Python function with no auth check, and an agent that can theoretically read your entire production database if the prompt is crafted correctly.</p>
+
+  <div class="callout warn">
+    <b>⚠️ The Real Risk</b>
+    <p>Without a structured data access layer, one prompt injection, one hallucinated query, or one model version update that changes how the agent interprets its tools can expose data it was never meant to see. The gap between "it works in the demo" and "it's safe in production" is enormous — and it's an infrastructure problem, not a model problem.</p>
+  </div>
+
+  <p><strong>Model Context Protocol (MCP)</strong> is an open protocol, originally developed by Anthropic and now community-governed, that defines a standard interface between AI agents and the data sources and tools they need to access. Instead of the agent calling your systems directly, it calls an <strong>MCP server</strong> — a structured gateway that handles authentication, scoping, audit logging, and response sanitization before any data moves.</p>
+
+  <div class="pullquote">
+    <p>"MCP is to AI agents what REST APIs were to microservices — the standardisation layer that turned a collection of direct connections into a composable, governable ecosystem."</p>
+  </div>
+
+  <p>An MCP server exposes three things to agents:</p>
+  <ul>
+    <li><strong>Resources</strong> — readable data (a database row, a file, a metrics snapshot). Always read-only, always returned as structured context.</li>
+    <li><strong>Tools</strong> — callable functions that may have side effects (run a query, trigger a workflow, update a record). These require explicit permission checks.</li>
+    <li><strong>Prompts</strong> — reusable prompt templates exposed by the server, so agents can reuse well-tested instructions without re-engineering them per-team.</li>
+  </ul>
+
+  <p>The key insight: <strong>the agent never touches your data directly</strong>. It asks the MCP server for what it needs. The MCP server decides what to return, to whom, and with what scope. That boundary is what makes agentic AI production-safe.</p>
+</div>
+
+<!-- ══════════════════════════ 02 WHY AGENTS FAIL ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">02</span> The Problem Space</div>
+  <h2>Why Agentic Systems Fail Without Proper Architecture</h2>
+
+  <p>These aren't hypothetical failure modes — they're the default trajectory of every agentic system built without a clear architectural plan. I've seen all of them in the wild.</p>
+
+  <div class="compare-wrap">
+    <table class="compare">
+      <thead>
+        <tr><th>Failure Mode</th><th>Without MCP</th><th>With MCP</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Data scope</strong></td>
+          <td class="no">Agent can access all data the connection allows</td>
+          <td class="yes">Agent can only access tools the server explicitly exposes</td>
+        </tr>
+        <tr>
+          <td><strong>Audit trail</strong></td>
+          <td class="no">No record of what the agent queried or why</td>
+          <td class="yes">Every call logged with agent identity, tool, args, result</td>
+        </tr>
+        <tr>
+          <td><strong>Prompt injection</strong></td>
+          <td class="no">Attacker can craft input that queries arbitrary data</td>
+          <td class="yes">MCP validates every call regardless of prompt content</td>
+        </tr>
+        <tr>
+          <td><strong>Multi-agent reuse</strong></td>
+          <td class="no">Each agent has its own brittle, one-off integration</td>
+          <td class="yes">Any agent speaks MCP — one server, many clients</td>
+        </tr>
+        <tr>
+          <td><strong>Operational model</strong></td>
+          <td class="no">No clear deployment, scaling, or rollback strategy</td>
+          <td class="yes">Agent and MCP server deployed, scaled, rolled back independently</td>
+        </tr>
+        <tr>
+          <td><strong>Runaway loops</strong></td>
+          <td class="no">Agent can loop and burn DB or API budgets unchecked</td>
+          <td class="yes">Rate limiting and iteration caps enforced at the MCP layer</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>This pattern emerged from real production work in FinTech environments where LLMs needed controlled access to internal systems. The requirement was strict: scoped read access to specific datasets, a full audit trail of every retrieval, and zero possibility of the agent accessing data outside its defined boundary. Direct database access was simply not an option. MCP was the architectural answer.</p>
+</div>
+
+<!-- ══════════════════════════ 03 THREE LAYERS ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">03</span> Architecture</div>
+  <h2>The Three-Layer Architecture</h2>
+
+  <p>A production-grade agentic system has three distinct layers. Getting the boundaries right is what makes the system maintainable, independently scalable, and debuggable.</p>
+
+  <div class="layers">
+    <div class="layer">
+      <div class="layer-badge">
+        <div class="layer-num l1">01</div>
+        <div class="layer-lbl l1">Agent</div>
+      </div>
+      <div>
+        <div class="layer-title">Agent Layer — reasoning and orchestration</div>
+        <div class="layer-desc">The LLM component that receives a goal, executes the reasoning loop, selects MCP tools, interprets results, and produces a response. Owns the "why" and "what" — has no knowledge of how data is fetched.</div>
+        <div class="layer-tags">
+          <span class="ltag">LLM</span><span class="ltag">ReAct loop</span><span class="ltag">Tool selection</span><span class="ltag">Memory store</span><span class="ltag">Iteration cap</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-badge">
+        <div class="layer-num l2">02</div>
+        <div class="layer-lbl l2">MCP</div>
+      </div>
+      <div>
+        <div class="layer-title">MCP Layer — structured connectivity and security</div>
+        <div class="layer-desc">MCP servers between agents and all data sources. Owns auth, scope, rate limiting, and audit logging. Tool definitions are versioned. The agent never bypasses this layer.</div>
+        <div class="layer-tags">
+          <span class="ltag">MCP server</span><span class="ltag">JWT auth</span><span class="ltag">Tool registry</span><span class="ltag">Rate limiter</span><span class="ltag">Audit log</span><span class="ltag">Versioning</span>
+        </div>
+      </div>
+    </div>
+    <div class="layer">
+      <div class="layer-badge">
+        <div class="layer-num l3">03</div>
+        <div class="layer-lbl l3">Infra</div>
+      </div>
+      <div>
+        <div class="layer-title">Infrastructure Layer — deployment, security, reliability</div>
+        <div class="layer-desc">Kubernetes, Cilium network policies, IRSA, ArgoCD, and the observability stack. Ensures the system is deployed securely, scales under load, fails gracefully, and can be debugged at 2am.</div>
+        <div class="layer-tags">
+          <span class="ltag">EKS</span><span class="ltag">Cilium/eBPF</span><span class="ltag">IRSA</span><span class="ltag">ArgoCD</span><span class="ltag">Karpenter</span><span class="ltag">Prometheus</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>High-level MCP flow</h3>
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">high-level-mcp-flow.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph TD
+    A["🤖 LLM Agent"] -->|"MCP Request"| B["MCP Gateway"]
+    B --> C{"Auth + Scope Check"}
+    C -->|"Denied"| D["🚫 Rejected + Logged"]
+    C -->|"Approved"| E["Tool Router"]
+    E --> F["Database Tool"]
+    E --> G["CloudWatch Tool"]
+    E --> H["API Tool"]
+    F --> I[("Read Replica")]
+    G --> J["AWS CloudWatch"]
+    H --> K["External APIs"]
+    I -->|"Structured JSON"| B
+    J -->|"Structured JSON"| B
+    K -->|"Structured JSON"| B
+    B -->|"Scoped Context"| A
+    B --> L["📝 Audit Log"]
+    style A fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style B fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style C fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+    style D fill:#fde8e8,stroke:#e03b2a,color:#0f0f14
+    style E fill:#f2f0ea,stroke:#3a3a4a,color:#0f0f14
+    style L fill:#fff7e8,stroke:#b45309,color:#0f0f14
+      </div>
+    </div>
+  </div>
+
+  <h3>Full three-layer architecture</h3>
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">three-layer-architecture.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph LR
+    subgraph AL["Agent Layer"]
+        A1["LLM Orchestrator"] --> A2["ReAct Loop"]
+        A2 --> A3["Tool Planner"]
+    end
+    subgraph ML["MCP Layer"]
+        B1["MCP Gateway"] --> B2["JWT Auth"]
+        B2 --> B3["Tool Registry"]
+        B3 --> B4["Rate Limiter"]
+    end
+    subgraph DL["Data Layer"]
+        C1["Read Replica"]
+        C2["Vector Store"]
+        C3["AWS Services"]
+        C4["Audit Logger"]
+    end
+    A3 -->|"MCP Protocol"| B1
+    B2 --> C4
+    B4 --> C1
+    B4 --> C2
+    B4 --> C3
+    style AL fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style ML fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style DL fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 04 AGENT LOOP ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">04</span> Layer 1 — Agent</div>
+  <h2>Inside the Agent: The ReAct Reasoning Loop</h2>
+
+  <p>An agent isn't just an LLM with a system prompt. It's a <strong>reasoning loop</strong> — a structured cycle of thinking and acting that continues until the agent has enough information to produce a final answer, or hits a hard stopping condition.</p>
+
+  <p>The dominant pattern is <strong>ReAct</strong> (Reason + Act). Each iteration has two phases: the model reasons about what it currently knows and what it still needs, then decides on an action — call an MCP tool, observe the result, or end the loop with a final answer.</p>
+
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">react-loop.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph TD
+    START["User Goal"] --> T1["🧠 Reason: what do I know? what do I need?"]
+    T1 --> D1{"Enough to answer?"}
+    D1 -->|"Yes"| END["✅ Final Answer"]
+    D1 -->|"No"| A1["Select MCP Tool"]
+    A1 --> A2["Call MCP Server"]
+    A2 --> A3["Observe Result"]
+    A3 --> LIM{"iteration < max?"}
+    LIM -->|"Yes"| T1
+    LIM -->|"No"| STOP["⚠️ Hard Stop"]
+    A2 -.->|"auth check"| SEC["🔒 MCP Auth Gate"]
+    style START fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style END   fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style STOP  fill:#fff7e8,stroke:#b45309,color:#0f0f14
+    style SEC   fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+      </div>
+    </div>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-head">
+      <span class="lang">Python</span>
+      <span class="fname">agent/agent.py</span>
+    </div>
+    <pre><span class="kw">import</span> anthropic
+<span class="kw">import</span> json
+<span class="kw">from</span> mcp_client <span class="kw">import</span> <span class="nm">MCPClient</span>
+<span class="kw">from</span> tracing <span class="kw">import</span> <span class="nm">TraceContext</span>
+
+client = anthropic.<span class="nm">Anthropic</span>()
+mcp = <span class="nm">MCPClient</span>(
+    server_url=<span class="st">"http://mcp-server.ai-platform.svc.cluster.local:8080"</span>,
+    agent_token=settings.<span class="nm">AGENT_JWT_TOKEN</span>,  <span class="cm"># scoped JWT — never a service key</span>
+)
+
+<span class="kw">async def</span> <span class="fn">run_agent</span>(user_goal: str, trace_id: str) -> str:
+    <span class="cm"># Discover tools at runtime — the MCP server returns only what</span>
+    <span class="cm"># this agent's JWT is scoped to see. Not a hardcoded list.</span>
+    available_tools = <span class="kw">await</span> mcp.<span class="fn">list_tools</span>()
+    messages = [{<span class="st">"role"</span>: <span class="st">"user"</span>, <span class="st">"content"</span>: user_goal}]
+
+    <span class="kw">with</span> <span class="nm">TraceContext</span>(trace_id=trace_id, goal=user_goal) <span class="kw">as</span> trace:
+        <span class="kw">for</span> iteration <span class="kw">in</span> <span class="fn">range</span>(<span class="num">10</span>):  <span class="cm"># hard cap — prevents runaway loops</span>
+            response = client.messages.<span class="fn">create</span>(
+                model=<span class="st">"claude-sonnet-4-20250514"</span>,
+                max_tokens=<span class="num">4096</span>,
+                tools=available_tools,
+                messages=messages,
+            )
+            trace.<span class="fn">log_llm_call</span>(iteration=iteration, tokens=response.usage)
+
+            <span class="kw">if</span> response.stop_reason == <span class="st">"end_turn"</span>:
+                <span class="kw">return</span> response.content[<span class="num">0</span>].text
+
+            <span class="kw">if</span> response.stop_reason == <span class="st">"tool_use"</span>:
+                tool_call = <span class="fn">next</span>(b <span class="kw">for</span> b <span class="kw">in</span> response.content <span class="kw">if</span> b.type == <span class="st">"tool_use"</span>)
+
+                <span class="cm"># All calls go through MCP — never direct to any data source</span>
+                result = <span class="kw">await</span> mcp.<span class="fn">call_tool</span>(
+                    name=tool_call.name,
+                    arguments=tool_call.input,
+                )
+                trace.<span class="fn">log_tool_call</span>(tool=tool_call.name, args=tool_call.input, result=result)
+
+                messages.<span class="fn">append</span>({<span class="st">"role"</span>: <span class="st">"assistant"</span>, <span class="st">"content"</span>: response.content})
+                messages.<span class="fn">append</span>({
+                    <span class="st">"role"</span>: <span class="st">"user"</span>,
+                    <span class="st">"content"</span>: [{
+                        <span class="st">"type"</span>: <span class="st">"tool_result"</span>,
+                        <span class="st">"tool_use_id"</span>: tool_call.id,
+                        <span class="st">"content"</span>: json.<span class="fn">dumps</span>(result),
+                    }],
+                })
+
+    <span class="kw">return</span> <span class="st">"Max iterations reached without completing."</span></pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 05 MCP SERVER ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">05</span> Layer 2 — MCP Server</div>
+  <h2>Building the MCP Server</h2>
+
+  <p>The MCP server is where security is enforced. It's not a pass-through proxy — it's a structured gateway with its own auth, versioned tool definitions, and rate limiting. The agent receives exactly what the server decides to return.</p>
+
+  <div class="code-wrap">
+    <div class="code-head">
+      <span class="lang">Python</span>
+      <span class="fname">mcp_server/server.py</span>
+    </div>
+    <pre><span class="kw">from</span> mcp.server <span class="kw">import</span> <span class="nm">Server</span>
+<span class="kw">import</span> mcp.types <span class="kw">as</span> types
+<span class="kw">from</span> .auth <span class="kw">import</span> <span class="fn">verify_scope</span>
+<span class="kw">from</span> .clients <span class="kw">import</span> <span class="nm">CostExplorerClient</span>, <span class="nm">CloudWatchClient</span>
+<span class="kw">from</span> .audit <span class="kw">import</span> <span class="fn">log_tool_call</span>
+
+app = <span class="nm">Server</span>(name=<span class="st">"infra-mcp-server"</span>, version=<span class="st">"1.2.0"</span>)
+
+<span class="op">@</span>app.<span class="fn">list_tools</span>()
+<span class="kw">async def</span> <span class="fn">list_tools</span>(caller_scope: list[str]) -> list[types.Tool]:
+    <span class="cm"># Dynamic tool discovery — only return tools this agent is scoped for</span>
+    all_tools = {
+        <span class="st">"get_monthly_spend"</span>: types.<span class="nm">Tool</span>(
+            name=<span class="st">"get_monthly_spend"</span>,
+            description=<span class="st">"Returns total AWS spend for a service and month. Read-only."</span>,
+            inputSchema={
+                <span class="st">"type"</span>: <span class="st">"object"</span>,
+                <span class="st">"properties"</span>: {
+                    <span class="st">"service"</span>: {<span class="st">"type"</span>: <span class="st">"string"</span>},
+                    <span class="st">"month"</span>:   {<span class="st">"type"</span>: <span class="st">"string"</span>, <span class="st">"description"</span>: <span class="st">"YYYY-MM"</span>},
+                },
+                <span class="st">"required"</span>: [<span class="st">"service"</span>, <span class="st">"month"</span>],
+            },
+        ),
+        <span class="st">"get_top_cost_resources"</span>: types.<span class="nm">Tool</span>(
+            name=<span class="st">"get_top_cost_resources"</span>,
+            description=<span class="st">"Returns the N most expensive resources this month. Max 20."</span>,
+            inputSchema={<span class="st">"type"</span>: <span class="st">"object"</span>, <span class="st">"properties"</span>: {<span class="st">"limit"</span>: {<span class="st">"type"</span>: <span class="st">"integer"</span>, <span class="st">"maximum"</span>: <span class="num">20</span>}}},
+        ),
+        <span class="st">"query_cloudwatch_metric"</span>: types.<span class="nm">Tool</span>(
+            name=<span class="st">"query_cloudwatch_metric"</span>,
+            description=<span class="st">"Returns p95/p99 stats for a CloudWatch metric over a time range."</span>,
+            inputSchema={
+                <span class="st">"type"</span>: <span class="st">"object"</span>,
+                <span class="st">"properties"</span>: {
+                    <span class="st">"namespace"</span>:   {<span class="st">"type"</span>: <span class="st">"string"</span>},
+                    <span class="st">"metric_name"</span>: {<span class="st">"type"</span>: <span class="st">"string"</span>},
+                    <span class="st">"hours"</span>:       {<span class="st">"type"</span>: <span class="st">"integer"</span>, <span class="st">"maximum"</span>: <span class="num">168</span>},
+                },
+                <span class="st">"required"</span>: [<span class="st">"namespace"</span>, <span class="st">"metric_name"</span>],
+            },
+        ),
+    }
+    <span class="kw">return</span> [t <span class="kw">for</span> name, t <span class="kw">in</span> all_tools.<span class="fn">items</span>() <span class="kw">if</span> name <span class="kw">in</span> caller_scope]
+
+<span class="op">@</span>app.<span class="fn">call_tool</span>()
+<span class="kw">async def</span> <span class="fn">call_tool</span>(name: str, arguments: dict, caller_id: str) -> list[types.TextContent]:
+    <span class="fn">verify_scope</span>(caller_id=caller_id, tool_name=name)  <span class="cm"># raises 403 if denied</span>
+    <span class="fn">log_tool_call</span>(caller_id=caller_id, tool=name, args=arguments)
+
+    <span class="kw">if</span> name == <span class="st">"get_monthly_spend"</span>:
+        result = <span class="kw">await</span> <span class="nm">CostExplorerClient</span>().<span class="fn">get_spend</span>(**arguments)
+    <span class="kw">elif</span> name == <span class="st">"get_top_cost_resources"</span>:
+        result = <span class="kw">await</span> <span class="nm">CostExplorerClient</span>().<span class="fn">get_top_resources</span>(limit=<span class="fn">min</span>(arguments.<span class="fn">get</span>(<span class="st">"limit"</span>, <span class="num">10</span>), <span class="num">20</span>))
+    <span class="kw">elif</span> name == <span class="st">"query_cloudwatch_metric"</span>:
+        result = <span class="kw">await</span> <span class="nm">CloudWatchClient</span>().<span class="fn">get_metric_stats</span>(**arguments)
+    <span class="kw">else</span>:
+        <span class="kw">raise</span> <span class="nm">ValueError</span>(<span class="st">f"Unknown tool: {name}"</span>)
+
+    <span class="kw">return</span> [types.<span class="nm">TextContent</span>(type=<span class="st">"text"</span>, text=json.<span class="fn">dumps</span>(result))]</pre>
+  </div>
+
+  <h3>Three gates before any data moves</h3>
+  <div class="gates">
+    <div class="gate">
+      <div class="gate-n">01</div>
+      <div class="gate-t">JWT Validation</div>
+      <div class="gate-d">Every request. Expired or missing = instant 401. No exceptions.</div>
+    </div>
+    <div class="gate">
+      <div class="gate-n">02</div>
+      <div class="gate-t">Tool Permission</div>
+      <div class="gate-d">Tool-level scope per agent identity. Denials are logged and never silently dropped.</div>
+    </div>
+    <div class="gate">
+      <div class="gate-n">03</div>
+      <div class="gate-t">Rate Limiting</div>
+      <div class="gate-d">Throttle per agent identity. Prevents runaway loops from burning your DB or API budgets.</div>
+    </div>
+  </div>
+
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">security-decision-flow.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph TD
+    A["Agent Request"] --> B{"JWT Valid?"}
+    B -->|"No"| C["🚫 401"]
+    B -->|"Yes"| D{"Tool Permitted?"}
+    D -->|"No"| E["🚫 403 + Audit Log"]
+    D -->|"Yes"| F{"Rate Limit OK?"}
+    F -->|"No"| G["🚫 429 Throttled"]
+    F -->|"Yes"| H["Execute Tool"]
+    H --> I["Sanitize Response"]
+    I --> J["✅ Return to Agent"]
+    H --> K["📝 Audit Log"]
+    style B fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+    style D fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+    style F fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+    style C fill:#fde8e8,stroke:#e03b2a,color:#0f0f14
+    style E fill:#fde8e8,stroke:#e03b2a,color:#0f0f14
+    style G fill:#fde8e8,stroke:#e03b2a,color:#0f0f14
+    style H fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style J fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style K fill:#fff7e8,stroke:#b45309,color:#0f0f14
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 06 EKS INFRA ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">06</span> Layer 3 — EKS Deployment</div>
+  <h2>Deploying on EKS: The Production Infrastructure</h2>
+
+  <p>This is the layer most AI engineering content skips — "and then you deploy it somehow." Here is the actual production architecture, with every decision that matters.</p>
+
+  <h3>Deployment topology on EKS</h3>
+  <p>Agent and MCP server are separate <code>Deployments</code> in a dedicated <code>ai-platform</code> namespace. They scale independently — the MCP server is the bottleneck (DB connections, API rate limits), not the agent. Each has its own <code>ServiceAccount</code> with a precisely scoped IRSA role.</p>
+
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">eks-deployment-topology.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph TB
+    subgraph EKS["EKS Cluster — us-east-1"]
+        subgraph NS["Namespace: ai-platform"]
+            subgraph AG["Agent Deployment — replicas: 2"]
+                A1["agent-pod-1"]
+                A2["agent-pod-2"]
+            end
+            subgraph MG["MCP Server Deployment — replicas: 3"]
+                M1["mcp-pod-1"]
+                M2["mcp-pod-2"]
+                M3["mcp-pod-3"]
+            end
+            SVC["mcp-server Service — ClusterIP :8080"]
+        end
+        KP["Karpenter NodePool"]
+        CIL["Cilium — eBPF enforcement"]
+    end
+    subgraph AWS["AWS Services"]
+        I1["IRSA: agent-role"]
+        I2["IRSA: mcp-role"]
+        CE["Cost Explorer"]
+        CW["CloudWatch"]
+    end
+    subgraph CD["GitOps"]
+        REPO["Git Repo — Helm"]
+        ARGO["ArgoCD Application"]
+    end
+    A1 & A2 -->|"HTTP"| SVC
+    SVC --> M1 & M2 & M3
+    AG -.->|"IRSA"| I1
+    MG -.->|"IRSA"| I2
+    I2 --> CE & CW
+    CIL -.->|"enforces"| NS
+    KP -.->|"provisions nodes"| NS
+    REPO --> ARGO -->|"sync"| NS
+    style EKS fill:#f2f0ea,stroke:#e8e5dc,color:#0f0f14
+    style NS  fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+    style AG  fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style MG  fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style AWS fill:#fff7e8,stroke:#b45309,color:#0f0f14
+    style CD  fill:#f3e8fd,stroke:#7c3aed,color:#0f0f14
+      </div>
+    </div>
+  </div>
+
+  <h3>Cilium NetworkPolicy — the eBPF boundary</h3>
+  <p>Cilium enforces network boundaries at the eBPF layer in the kernel — before packets touch the network stack. The agent can only reach the MCP server. The MCP server can only reach AWS endpoints. Lateral movement is blocked by default.</p>
+
+  <div class="callout warn">
+    <b>⚠️ A Common Mistake</b>
+    <p>Deploying with broad egress rules "for now" and planning to tighten later. In practice, "later" never comes. You end up with an AI agent that can reach arbitrary internal services — which is exactly what MCP was designed to prevent.</p>
+  </div>
+
+  <div class="code-wrap">
+    <div class="code-head">
+      <span class="lang">YAML</span>
+      <span class="fname">k8s/network-policy.yaml</span>
+    </div>
+    <pre><span class="cm"># Agent pods: egress to MCP server only</span>
+<span class="nm">apiVersion</span>: networking.k8s.io/v1
+<span class="nm">kind</span>: NetworkPolicy
+<span class="nm">metadata</span>:
+  <span class="nm">name</span>: <span class="st">agent-egress</span>
+  <span class="nm">namespace</span>: <span class="st">ai-platform</span>
+<span class="nm">spec</span>:
+  <span class="nm">podSelector</span>:
+    <span class="nm">matchLabels</span>: { <span class="nm">role</span>: <span class="st">ai-agent</span> }
+  <span class="nm">policyTypes</span>: [Egress]
+  <span class="nm">egress</span>:
+  - <span class="nm">to</span>:
+    - <span class="nm">podSelector</span>:
+        <span class="nm">matchLabels</span>: { <span class="nm">app</span>: <span class="st">mcp-server</span> }
+    <span class="nm">ports</span>: [{ <span class="nm">protocol</span>: TCP, <span class="nm">port</span>: <span class="num">8080</span> }]
+  - <span class="nm">ports</span>: [{ <span class="nm">protocol</span>: UDP, <span class="nm">port</span>: <span class="num">53</span> }]  <span class="cm"># DNS only</span>
+---
+<span class="cm"># MCP server: ingress from agents only, egress to AWS HTTPS only</span>
+<span class="nm">apiVersion</span>: networking.k8s.io/v1
+<span class="nm">kind</span>: NetworkPolicy
+<span class="nm">metadata</span>:
+  <span class="nm">name</span>: <span class="st">mcp-server-policy</span>
+  <span class="nm">namespace</span>: <span class="st">ai-platform</span>
+<span class="nm">spec</span>:
+  <span class="nm">podSelector</span>:
+    <span class="nm">matchLabels</span>: { <span class="nm">app</span>: <span class="st">mcp-server</span> }
+  <span class="nm">policyTypes</span>: [Ingress, Egress]
+  <span class="nm">ingress</span>:
+  - <span class="nm">from</span>:
+    - <span class="nm">podSelector</span>:
+        <span class="nm">matchLabels</span>: { <span class="nm">role</span>: <span class="st">ai-agent</span> }  <span class="cm"># only agent pods</span>
+    <span class="nm">ports</span>: [{ <span class="nm">protocol</span>: TCP, <span class="nm">port</span>: <span class="num">8080</span> }]
+  <span class="nm">egress</span>:
+  - <span class="nm">to</span>:
+    - <span class="nm">ipBlock</span>:
+        <span class="nm">cidr</span>: <span class="st">0.0.0.0/0</span>
+        <span class="nm">except</span>: [<span class="st">10.0.0.0/8</span>, <span class="st">172.16.0.0/12</span>, <span class="st">192.168.0.0/16</span>]
+    <span class="nm">ports</span>: [{ <span class="nm">port</span>: <span class="num">443</span> }]  <span class="cm"># HTTPS to AWS APIs only</span></pre>
+  </div>
+
+  <h3>IRSA — no credentials, no rotation</h3>
+  <p>Never use environment variable access keys for an MCP server. Use <strong>IRSA</strong> (IAM Roles for Service Accounts). The EKS OIDC provider mints short-lived credentials automatically, scoped to exactly the IAM role the <code>ServiceAccount</code> is annotated with. The IAM policy gives the MCP server read-only Cost Explorer and CloudWatch access — nothing else.</p>
+
+  <div class="code-wrap">
+    <div class="code-head">
+      <span class="lang">HCL (Terraform)</span>
+      <span class="fname">aws/iam/mcp-server-role.tf</span>
+    </div>
+    <pre><span class="cm"># MCP server IRSA role — least privilege: Cost Explorer + CloudWatch read only</span>
+<span class="nm">module</span> <span class="st">"mcp_server_irsa"</span> {
+  <span class="nm">source</span> = <span class="st">"github.com/pradeep-kapa/multi-cloud-iac-library//aws/iam?ref=v1.0.0"</span>
+
+  <span class="nm">role_name</span>                 = <span class="st">"mcp-server-role"</span>
+  <span class="nm">oidc_provider_arn</span>         = module.eks.oidc_provider_arn
+  <span class="nm">oidc_provider_url</span>         = module.eks.oidc_issuer_url
+  <span class="nm">service_account_namespace</span> = <span class="st">"ai-platform"</span>
+  <span class="nm">service_account_name</span>      = <span class="st">"mcp-server-sa"</span>
+
+  <span class="nm">inline_policy_json</span> = jsonencode({
+    <span class="nm">Version</span> = <span class="st">"2012-10-17"</span>
+    <span class="nm">Statement</span> = [
+      {
+        <span class="nm">Sid</span>      = <span class="st">"CostExplorerReadOnly"</span>
+        <span class="nm">Effect</span>   = <span class="st">"Allow"</span>
+        <span class="nm">Action</span>   = [<span class="st">"ce:GetCostAndUsage"</span>, <span class="st">"ce:GetCostForecast"</span>]
+        <span class="nm">Resource</span> = <span class="st">"*"</span>
+      },
+      {
+        <span class="nm">Sid</span>      = <span class="st">"CloudWatchReadOnly"</span>
+        <span class="nm">Effect</span>   = <span class="st">"Allow"</span>
+        <span class="nm">Action</span>   = [<span class="st">"cloudwatch:GetMetricData"</span>, <span class="st">"cloudwatch:GetMetricStatistics"</span>]
+        <span class="nm">Resource</span> = <span class="st">"*"</span>
+      },
+    ]
+  })
+}</pre>
+  </div>
+
+  <h3>ArgoCD GitOps — no manual kubectl in production</h3>
+
+  <div class="code-wrap">
+    <div class="code-head">
+      <span class="lang">YAML</span>
+      <span class="fname">argocd/ai-platform-app.yaml</span>
+    </div>
+    <pre><span class="nm">apiVersion</span>: argoproj.io/v1alpha1
+<span class="nm">kind</span>: Application
+<span class="nm">metadata</span>:
+  <span class="nm">name</span>: <span class="st">ai-platform</span>
+  <span class="nm">namespace</span>: <span class="st">argocd</span>
+<span class="nm">spec</span>:
+  <span class="nm">project</span>: <span class="st">default</span>
+  <span class="nm">source</span>:
+    <span class="nm">repoURL</span>: <span class="st">https://github.com/pradeep-kapa/ai-platform-infra</span>
+    <span class="nm">targetRevision</span>: <span class="st">HEAD</span>
+    <span class="nm">path</span>: <span class="st">helm/ai-platform</span>
+  <span class="nm">destination</span>:
+    <span class="nm">server</span>: <span class="st">https://kubernetes.default.svc</span>
+    <span class="nm">namespace</span>: <span class="st">ai-platform</span>
+  <span class="nm">syncPolicy</span>:
+    <span class="nm">automated</span>:
+      <span class="nm">prune</span>: <span class="kw">true</span>      <span class="cm"># remove resources deleted from Git</span>
+      <span class="nm">selfHeal</span>: <span class="kw">true</span>   <span class="cm"># revert manual kubectl changes automatically</span>
+    <span class="nm">syncOptions</span>: [CreateNamespace=true]</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 07 OBSERVABILITY ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">07</span> Observability</div>
+  <h2>Debugging Agents in Production</h2>
+
+  <p>Agents are harder to debug than regular services because their behaviour is <strong>non-deterministic</strong>. The same input can produce different tool call sequences depending on context, temperature, and model version. You need a complete trace — not just logs.</p>
+
+  <div class="diagram-card">
+    <div class="diagram-head">
+      <div class="dot" style="background:#ff5f57"></div>
+      <div class="dot" style="background:#ffbd2e"></div>
+      <div class="dot" style="background:#28c840"></div>
+      <span class="diagram-title">observability-stack.mmd</span>
+    </div>
+    <div class="diagram-body">
+      <div class="mermaid">
+graph LR
+    subgraph PODS["EKS Pods"]
+        AGP["Agent Pod — structured JSON logs"]
+        MCP["MCP Server Pod — structured JSON logs"]
+    end
+    subgraph COL["Collection"]
+        FB["Fluent Bit DaemonSet"]
+    end
+    subgraph OBS["Observability Stack"]
+        ELK["Logz.io / ELK\n(trace correlation)"]
+        PROM["Prometheus\n(metrics)"]
+        GRAF["Grafana\n(dashboards + alerts)"]
+    end
+    AGP & MCP -->|"stdout"| FB
+    FB --> ELK
+    AGP & MCP -->|"/metrics"| PROM
+    PROM --> GRAF
+    ELK -.->|"trace_id"| GRAF
+    style PODS fill:#e8f4fd,stroke:#1a1aff,color:#0f0f14
+    style COL  fill:#fff7e8,stroke:#b45309,color:#0f0f14
+    style OBS  fill:#e8f7f0,stroke:#00a877,color:#0f0f14
+      </div>
+    </div>
+  </div>
+
+  <p>Every log line from both the agent and MCP server is structured JSON with a shared <code>trace_id</code>. When an agent gives a wrong answer, you pull the trace from Logz.io and replay the exact sequence of tool calls and model responses — no guessing about what the model decided to do.</p>
+
+  <h3>End-to-end call sequence — "What did we spend on EC2 last month?"</h3>
+
+  <div class="seq">
+    <div class="seq-head">Request trace — 8 steps, ~2.8s total</div>
+    <div class="seq-step">
+      <div class="sn">01</div><div class="sfrom">User → Agent</div>
+      <div class="swhat">Natural language goal received. Trace ID assigned. Agent starts ReAct loop, iteration 1.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">02</div><div class="sfrom">Agent → MCP</div>
+      <div class="swhat">Calls <code>list_tools()</code>. MCP validates JWT, returns scoped tools: <code>get_monthly_spend</code>, <code>get_top_cost_resources</code>.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">03</div><div class="sfrom">Agent → LLM</div>
+      <div class="swhat">Sends goal + tool definitions. Model decides: call <code>get_monthly_spend(service="Amazon EC2", month="2025-03")</code> first.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">04</div><div class="sfrom">Agent → MCP</div>
+      <div class="swhat">Tool call dispatched. MCP runs JWT check → permission check → rate limit. All pass. Queries Cost Explorer via IRSA.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">05</div><div class="sfrom">MCP → Agent</div>
+      <div class="swhat">Returns <code>{"total": "$42,817", "currency": "USD", "period": "2025-03"}</code>. MCP logs call with caller identity, args, and result.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">06</div><div class="sfrom">Agent → MCP</div>
+      <div class="swhat">Iteration 2: model calls <code>get_top_cost_resources(limit=10)</code> to identify which instances drove the cost.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">07</div><div class="sfrom">MCP → Agent</div>
+      <div class="swhat">Returns top 10 resources with costs. Response sanitized — no internal IDs or connection strings leak through.</div>
+    </div>
+    <div class="seq-step">
+      <div class="sn">08</div><div class="sfrom">Agent → User</div>
+      <div class="swhat">Final answer synthesised. 2 tool calls, 0 auth failures. Full trace stored. Total latency: 2.8s.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════ 08 TAKEAWAYS ══════════════════════════ -->
+<div class="sec">
+  <div class="sec-label"><span class="sec-num">08</span> Key Takeaways</div>
+  <h2>What This Architecture Gets You</h2>
+
+  <div class="wins">
+    <div class="win"><div class="win-ic">🔒</div><div class="win-tx"><strong>Zero Direct Data Access</strong>LLM agents never touch your DB or AWS APIs directly. MCP is the only path.</div></div>
+    <div class="win"><div class="win-ic">📝</div><div class="win-tx"><strong>Full Audit Trail</strong>Every tool call — approved or denied — logged with agent identity, args, and result.</div></div>
+    <div class="win"><div class="win-ic">📈</div><div class="win-tx"><strong>Independent Scaling</strong>Agent and MCP server scale separately. Scale the bottleneck without touching agent code.</div></div>
+    <div class="win"><div class="win-ic">🔄</div><div class="win-tx"><strong>Tool Versioning</strong>Update tools on the MCP server without changing agents. Agents discover tools at runtime.</div></div>
+    <div class="win"><div class="win-ic">🤝</div><div class="win-tx"><strong>Multi-Agent Ready</strong>Any LLM speaks MCP — Claude, GPT-4o, Llama. One server, any number of clients.</div></div>
+    <div class="win"><div class="win-ic">🛡️</div><div class="win-tx"><strong>eBPF Network Enforcement</strong>Cilium blocks lateral movement at kernel level. The agent cannot reach anything except the MCP server.</div></div>
+    <div class="win"><div class="win-ic">🔑</div><div class="win-tx"><strong>No Credential Management</strong>IRSA handles AWS auth automatically. No access keys, no rotation, no secrets in env vars.</div></div>
+    <div class="win"><div class="win-ic">🔍</div><div class="win-tx"><strong>Traceable Debugging</strong>Correlated trace IDs across agent and MCP logs. Replay any request sequence to understand exactly what the model decided.</div></div>
+  </div>
+
+  <div class="callout key">
+    <b>💡 The Principal Architect Principle</b>
+    <p>Build the MCP layer and the infrastructure layer <em>first</em>. Then build the agent. Security, observability, and operational boundaries are not features you add later — they are the foundation everything else sits on. An agent that works in a demo but cannot be audited, scoped, or debugged is not a production system.</p>
+  </div>
+</div>
+
+<hr/>
+
+
+
+<!-- CTA -->
+<div class="cta">
+  <div>
+    <div class="cta-lbl">Coming Next — Part 2</div>
+    <div class="cta-title">Full Implementation: Helm Charts, HPA, Multi-Agent Patterns, Advanced Cilium L7</div>
+    <div class="cta-desc">Complete Helm chart · Horizontal Pod Autoscaler · Multi-agent shared MCP · Cilium L7 HTTP policies · SLO setup for agent reliability · Cost breakdown on EKS</div>
+  </div>
+  <a href="https://www.linkedin.com/in/pradeepkapa" target="_blank" rel="noopener" class="cta-btn">Follow for Part 2 ↗</a>
+</div>
+
+<p style="font-family:var(--sans);font-size:0.83rem;color:var(--ink3);margin-top:1.75rem">
+  Open source work referenced: &nbsp;
+  <a href="https://github.com/pradeep-kapa/multi-cloud-iac-library" target="_blank" rel="noopener">multi-cloud-iac-library</a> ·
+  <a href="https://github.com/pradeep-kapa/cloud-cost-rightsizer" target="_blank" rel="noopener">cloud-cost-rightsizer</a>
+</p>
+
+</article>
+</div>
+
+<footer>
+  <p>Written by <a href="https://pradeep-kapa.github.io" target="_blank" rel="noopener">Pradeep Kapa</a> · Senior Software Engineer | Cloud · SRE · AI Platforms</p>
+  <p style="margin-top:4px">AWS Certified Solutions Architect – Professional &nbsp;·&nbsp; HashiCorp Certified: Terraform Associate (003)</p>
+  <a href="https://pradeep-kapa.github.io" class="back-link">← Back to portfolio</a>
+</footer>
+
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  theme: 'default',
+  themeVariables: {
+    primaryColor:       '#e8f4fd',
+    primaryTextColor:   '#0f0f14',
+    primaryBorderColor: '#1a1aff',
+    lineColor:          '#3a3a4a',
+    secondaryColor:     '#e8f7f0',
+    tertiaryColor:      '#f3e8fd',
+    background:         '#ffffff',
+    mainBkg:            '#faf9f6',
+    clusterBkg:         '#f2f0ea',
+    clusterBorder:      '#e8e5dc',
+    edgeLabelBackground:'#faf9f6',
+    fontFamily:         "'Instrument Sans', sans-serif",
+    fontSize:           '13px',
+  },
+  flowchart: { curve: 'basis', htmlLabels: true, padding: 18 }
+});
+</script>
+</body>
+</html>
