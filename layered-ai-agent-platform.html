@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Layered AI Agent Platform — Architecture Deep Dive · Pradeep Kapa</title>
+<meta name="description" content="How to architect a production-grade AI agent system with strict layer separation — LLM orchestration, RAG, tool calling, memory, guardrails, and evaluation."/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root{--bg:#0d0d0f;--bg2:#131316;--bg3:#1a1a1f;--border:#26262e;--text:#e8e8ed;--muted:#6b6b7b;--accent:#7c6af7;--accent2:#4fc38e;--warn:#f0a130;--red:#e05a5a;--mono:'JetBrains Mono',monospace;--sans:'Inter',-apple-system,sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);font-size:16px;line-height:1.75;}
+nav{position:sticky;top:0;z-index:100;background:rgba(13,13,15,0.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 40px;height:56px;display:flex;align-items:center;justify-content:space-between;}
+.nav-logo{font-family:var(--mono);font-size:14px;color:var(--text);text-decoration:none;font-weight:500;}
+.nav-links{display:flex;gap:24px;}
+.nav-links a{font-size:13px;color:var(--muted);text-decoration:none;transition:color 0.2s;}
+.nav-links a:hover{color:var(--text);}
+.hero{max-width:760px;margin:0 auto;padding:72px 40px 48px;}
+.series{font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:20px;}
+.tags{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px;}
+.tag{font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:3px;border:1px solid;}
+.tp{border-color:rgba(124,106,247,0.3);color:#a78bfa;background:rgba(124,106,247,0.06);}
+.tg{border-color:rgba(79,195,142,0.3);color:var(--accent2);background:rgba(79,195,142,0.06);}
+.ta{border-color:rgba(240,161,48,0.3);color:var(--warn);background:rgba(240,161,48,0.06);}
+h1{font-size:clamp(26px,3.5vw,44px);font-weight:600;line-height:1.15;color:var(--text);margin-bottom:20px;letter-spacing:-0.02em;}
+.sub{font-size:18px;color:var(--muted);line-height:1.6;margin-bottom:32px;max-width:620px;}
+.meta{display:flex;align-items:center;gap:16px;padding-top:24px;border-top:1px solid var(--border);}
+.av{width:40px;height:40px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;color:#fff;flex-shrink:0;}
+.mn{font-size:14px;font-weight:500;color:var(--text);}
+.mi{font-size:13px;color:var(--muted);}
+.mi a{color:var(--accent);text-decoration:none;}
+.stats{max-width:760px;margin:0 auto;padding:0 40px 40px;display:flex;gap:40px;flex-wrap:wrap;border-bottom:1px solid var(--border);}
+.sn{font-family:var(--mono);font-size:28px;font-weight:700;color:var(--accent);}
+.sl{font-size:12px;color:var(--muted);margin-top:2px;}
+.body{max-width:760px;margin:0 auto;padding:0 40px 80px;}
+.body h2{font-size:24px;font-weight:600;color:var(--text);margin:56px 0 16px;letter-spacing:-0.01em;padding-top:24px;border-top:1px solid var(--border);}
+.body h3{font-size:18px;font-weight:500;color:var(--text);margin:36px 0 12px;}
+.body p{color:#c8c8d4;margin-bottom:20px;}
+.body ul,.body ol{color:#c8c8d4;margin:0 0 20px 24px;}
+.body li{margin-bottom:8px;}
+.body strong{color:var(--text);font-weight:500;}
+.body a{color:var(--accent);text-decoration:none;border-bottom:1px solid rgba(124,106,247,0.3);}
+.body a:hover{border-bottom-color:var(--accent);}
+.sn2{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:0.1em;margin-bottom:8px;}
+.body pre{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:20px 24px;overflow-x:auto;margin:24px 0;}
+.body pre code{font-family:var(--mono);font-size:13px;color:#c8c8d4;line-height:1.6;}
+.body code{font-family:var(--mono);font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:3px;padding:2px 6px;color:var(--accent2);}
+.body pre code{background:none;border:none;padding:0;color:inherit;}
+.callout{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:16px 20px;margin:24px 0;}
+.callout.g{border-left-color:var(--accent2);}
+.callout.a{border-left-color:var(--warn);}
+.cl{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;}
+.callout p{color:#c8c8d4;margin:0;font-size:15px;}
+.lt{width:100%;border-collapse:collapse;margin:24px 0;font-size:14px;}
+.lt th{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);padding:10px 14px;text-align:left;border-bottom:1px solid var(--border);}
+.lt td{padding:12px 14px;border-bottom:1px solid rgba(38,38,46,0.6);color:#c8c8d4;vertical-align:top;}
+.lt tr:last-child td{border-bottom:none;}
+.ln{font-family:var(--mono);font-size:12px;color:var(--text);font-weight:500;}
+.ld{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;}
+.aw{background:#0f1117;border:1px solid #1e2535;border-radius:8px;padding:24px 16px;margin:24px 0;overflow-x:auto;}
+.aw svg{width:100%;max-width:860px;display:block;margin:0 auto;}
+.al{margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;padding:0 8px;}
+.al span{display:flex;align-items:center;gap:6px;font-family:monospace;font-size:11px;color:#64748b;}
+.al i{display:inline-block;width:14px;height:3px;border-radius:2px;}
+.cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px;margin:24px 0;}
+.cc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px;}
+.ch{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.ci{font-size:18px;}
+.cn{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--text);}
+.cp{font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:2px;}
+.cd{font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:10px;}
+.cl2{list-style:none;padding:0;margin:0;}
+.cl2 li{font-size:12px;color:var(--muted);padding:2px 0 2px 14px;position:relative;}
+.cl2 li::before{content:'→';position:absolute;left:0;color:var(--accent);}
+.flow{display:flex;flex-direction:column;}
+.fs{display:flex;gap:16px;padding:14px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+.fs:last-child{border-bottom:none;}
+.fn{font-family:var(--mono);font-size:11px;color:var(--accent);background:rgba(124,106,247,0.08);border:1px solid rgba(124,106,247,0.2);border-radius:4px;padding:4px 8px;min-width:36px;text-align:center;margin-top:2px;flex-shrink:0;}
+.ft{font-family:var(--mono);font-size:13px;color:var(--text);margin-bottom:4px;}
+.fd{font-size:13px;color:var(--muted);}
+.fb{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;margin-top:6px;display:inline-block;}
+.ba{background:rgba(0,212,255,0.08);color:#67e8f9;}
+.bg{background:rgba(224,90,90,0.08);color:#fca5a5;}
+.bo{background:rgba(124,106,247,0.08);color:#a78bfa;}
+.bt{background:rgba(79,195,142,0.08);color:var(--accent2);}
+.bl{background:rgba(240,161,48,0.08);color:var(--warn);}
+.bm{background:rgba(99,102,241,0.08);color:#818cf8;}
+.bx{background:rgba(148,163,184,0.08);color:#94a3b8;}
+.pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin:24px 0;}
+.pc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:18px;}
+.pn{font-family:var(--mono);font-size:24px;font-weight:700;color:rgba(124,106,247,0.2);margin-bottom:6px;}
+.pt{font-family:var(--mono);font-size:12px;color:var(--accent);margin-bottom:6px;}
+.pd{font-size:13px;color:var(--muted);line-height:1.5;}
+.adrl{display:flex;flex-direction:column;gap:12px;margin:24px 0;}
+.adr{background:var(--bg2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:18px;}
+.ah{display:flex;justify-content:space-between;margin-bottom:8px;}
+.an{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.as{font-family:var(--mono);font-size:10px;padding:2px 8px;border-radius:3px;background:rgba(79,195,142,0.1);color:var(--accent2);}
+.at{font-family:var(--mono);font-size:14px;color:var(--text);margin-bottom:6px;}
+.ad{font-size:13px;color:var(--muted);line-height:1.5;}
+footer{max-width:760px;margin:0 auto;padding:40px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;}
+.fl{font-size:13px;color:var(--muted);}
+.fll{display:flex;gap:16px;}
+.fll a{font-family:var(--mono);font-size:12px;color:var(--muted);text-decoration:none;}
+.fll a:hover{color:var(--text);}
+@media(max-width:640px){.hero,.body,.stats,footer{padding-left:20px;padding-right:20px;}nav{padding:0 20px;}.cg,.pg{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="https://pradeep-kapa.github.io" class="nav-logo">PK · Blog</a>
+  <div class="nav-links">
+    <a href="https://pradeep-kapa.github.io">Portfolio</a>
+    <a href="https://pradeep-kapa.github.io/#projects">Projects</a>
+    <a href="https://github.com/pradeep-kapa/layered-ai-agent-platform" target="_blank">GitHub ↗</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="series">AI Infrastructure Series · LLM Platform Design · 18 min read</div>
+  <div class="tags">
+    <span class="tag tp">LLM Orchestration</span><span class="tag tg">RAG</span>
+    <span class="tag tg">Tool Calling</span><span class="tag ta">Guardrails</span>
+    <span class="tag tp">Evaluation</span><span class="tag ta">FastAPI · Python</span>
+  </div>
+  <h1>Layered AI Agent Platform: How to Actually Architect an LLM System</h1>
+  <p class="sub">Most LLM projects are chatbot wrappers. This is a deep dive into building a production-grade agent platform with 9 strict layers — where the LLM only ever reasons and writes, and everything else is enforced code.</p>
+  <div class="meta">
+    <div class="av">PK</div>
+    <div>
+      <div class="mn">Pradeep Kapa</div>
+      <div class="mi">Senior Software Engineer · Cloud · SRE · AI Platforms · <a href="https://www.linkedin.com/in/pradeepkapa" target="_blank">LinkedIn</a> · <a href="https://github.com/pradeep-kapa" target="_blank">GitHub</a></div>
+    </div>
+  </div>
+</div>
+
+<div class="stats">
+  <div><div class="sn">9</div><div class="sl">Platform Layers</div></div>
+  <div><div class="sn">5</div><div class="sl">ADRs Documented</div></div>
+  <div><div class="sn">5</div><div class="sl">Deterministic Tools</div></div>
+  <div><div class="sn">4</div><div class="sl">Evaluation Tiers</div></div>
+</div>
+
+<div class="body">
+
+<div class="sn2">01 — The Problem</div>
+<h2>Why Most LLM Systems Break in Production</h2>
+<p>There's a gap between an LLM demo that works and an LLM system that's safe, reliable, and maintainable in production. The gap is almost entirely architectural.</p>
+<p>The failure pattern is consistent: a single file with an API call, some tools bolted on, a system prompt that says "only respond about X", and the belief that the model will behave because you asked it to.</p>
+<div class="callout a"><div class="cl">The core problem</div><p>Prompt instructions are suggestions, not enforcement. A Pydantic validator that rejects a malformed output cannot be jailbroken. A tool that runs Python cannot hallucinate numbers. These are fundamentally different guarantees — and most LLM projects treat them as equivalent.</p></div>
+<p>The Layered AI Agent Platform is built around one idea: <strong>every concern lives in its own layer with an explicit contract about what it does and what it never does</strong>.</p>
+
+<div class="sn2">02 — System Architecture</div>
+<h2>Nine Layers, Nine Contracts</h2>
+<p>The name "Layered" isn't marketing — it's the entire design philosophy. No leakage between layers. No shortcuts. Every layer is independently testable and replaceable.</p>
+
+<div class="aw">
+  <svg viewBox="0 0 860 620" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="arr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#334155"/></marker></defs>
+    <rect x="280" y="10" width="300" height="44" rx="6" fill="rgba(0,212,255,0.06)" stroke="#00d4ff" stroke-width="1" stroke-opacity="0.4"/>
+    <text x="430" y="28" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#64748b">CLIENT / APPLICATION</text>
+    <text x="430" y="44" text-anchor="middle" font-family="Space Mono,monospace" font-size="12" fill="#00d4ff" font-weight="700">User Query</text>
+    <line x1="430" y1="54" x2="430" y2="78" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <text x="440" y="70" font-family="Space Mono,monospace" font-size="9" fill="#475569">HTTP POST /query</text>
+    <rect x="200" y="80" width="460" height="52" rx="6" fill="rgba(0,212,255,0.08)" stroke="#00d4ff" stroke-width="1.5"/>
+    <text x="220" y="100" font-family="Space Mono,monospace" font-size="10" fill="#64748b">API LAYER</text>
+    <text x="430" y="102" text-anchor="middle" font-family="Space Mono,monospace" font-size="13" fill="#00d4ff" font-weight="700">FastAPI · Pydantic v2 · Routes</text>
+    <text x="430" y="120" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#64748b">/query  /health  /reports  /memory</text>
+    <line x1="430" y1="132" x2="430" y2="156" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="160" y="158" width="540" height="44" rx="6" fill="rgba(239,68,68,0.07)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <text x="180" y="176" font-family="Space Mono,monospace" font-size="10" fill="#ef4444">GUARDRAILS (INPUT)</text>
+    <text x="430" y="191" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#fca5a5">Schema Validation · PII Detection · Policy Check</text>
+    <line x1="430" y1="202" x2="430" y2="226" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="120" y="228" width="620" height="60" rx="6" fill="rgba(124,58,237,0.1)" stroke="#7c3aed" stroke-width="1.5"/>
+    <text x="140" y="248" font-family="Space Mono,monospace" font-size="10" fill="#a78bfa">ORCHESTRATION LAYER</text>
+    <text x="430" y="253" text-anchor="middle" font-family="Space Mono,monospace" font-size="13" fill="#a78bfa" font-weight="700">Planner → Router → Executor</text>
+    <text x="430" y="272" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#7c3aed">tool-driven · retrieval-driven · memory-driven · mixed</text>
+    <line x1="200" y1="288" x2="130" y2="360" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="340" y1="288" x2="320" y2="360" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="520" y1="288" x2="530" y2="360" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="680" y1="288" x2="730" y2="360" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="40" y="362" width="180" height="80" rx="6" fill="rgba(16,185,129,0.08)" stroke="#10b981" stroke-width="1.5"/>
+    <text x="58" y="382" font-family="Space Mono,monospace" font-size="9" fill="#6ee7b7">TOOLS</text>
+    <text x="130" y="392" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#10b981" font-weight="700">Deterministic</text>
+    <text x="130" y="408" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#6ee7b7">data_summary</text>
+    <text x="130" y="422" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#6ee7b7">breakdown</text>
+    <text x="130" y="436" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#6ee7b7">anomaly_detector</text>
+    <rect x="245" y="362" width="150" height="80" rx="6" fill="rgba(236,72,153,0.08)" stroke="#ec4899" stroke-width="1.5"/>
+    <text x="263" y="382" font-family="Space Mono,monospace" font-size="9" fill="#f9a8d4">RETRIEVAL</text>
+    <text x="320" y="394" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#ec4899" font-weight="700">RAG</text>
+    <text x="320" y="410" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#f9a8d4">FAISS → Pinecone</text>
+    <text x="320" y="424" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#f9a8d4">Chunking Pipeline</text>
+    <text x="320" y="438" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#f9a8d4">Citations</text>
+    <rect x="420" y="362" width="160" height="80" rx="6" fill="rgba(99,102,241,0.08)" stroke="#6366f1" stroke-width="1.5"/>
+    <text x="438" y="382" font-family="Space Mono,monospace" font-size="9" fill="#a5b4fc">MEMORY</text>
+    <text x="500" y="394" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#818cf8" font-weight="700">Two-Tier</text>
+    <text x="500" y="410" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#a5b4fc">Session (ephemeral)</text>
+    <text x="500" y="424" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#a5b4fc">User Profile (Redis)</text>
+    <text x="500" y="438" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#a5b4fc">Summary Memory</text>
+    <rect x="610" y="362" width="190" height="80" rx="6" fill="rgba(148,163,184,0.06)" stroke="#475569" stroke-width="1.5"/>
+    <text x="628" y="382" font-family="Space Mono,monospace" font-size="9" fill="#64748b">OBSERVABILITY</text>
+    <text x="705" y="394" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#94a3b8" font-weight="700">Full Tracing</text>
+    <text x="705" y="410" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#64748b">structlog (JSON)</text>
+    <text x="705" y="424" text-anchor="middle" font-family="Space Mono,monospace" font-size="9" fill="#64748b">Trace IDs · OTel-ready</text>
+    <line x1="200" y1="444" x2="350" y2="500" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="320" y1="444" x2="390" y2="500" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <line x1="500" y1="444" x2="450" y2="500" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="160" y="502" width="540" height="52" rx="6" fill="rgba(245,158,11,0.08)" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="180" y="522" font-family="Space Mono,monospace" font-size="10" fill="#fbbf24">LLM LAYER</text>
+    <text x="430" y="524" text-anchor="middle" font-family="Space Mono,monospace" font-size="13" fill="#f59e0b" font-weight="700">Model Gateway · Prompt Builder · Response Parser</text>
+    <text x="430" y="542" text-anchor="middle" font-family="Space Mono,monospace" font-size="10" fill="#78716c">OpenAI · Anthropic · Stub (dev) — all behind same interface</text>
+    <line x1="430" y1="554" x2="430" y2="572" stroke="#334155" stroke-width="1.5" marker-end="url(#arr)"/>
+    <rect x="160" y="574" width="540" height="36" rx="6" fill="rgba(239,68,68,0.07)" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,2"/>
+    <text x="180" y="593" font-family="Space Mono,monospace" font-size="10" fill="#ef4444">GUARDRAILS (OUTPUT)</text>
+    <text x="430" y="601" text-anchor="middle" font-family="Space Mono,monospace" font-size="11" fill="#fca5a5">Output Schema Check · Hallucination Detection · Number Grounding</text>
+  </svg>
+  <div class="al">
+    <span><i style="background:#00d4ff"></i>API</span>
+    <span><i style="background:#ef4444"></i>Guardrails</span>
+    <span><i style="background:#7c3aed"></i>Orchestration</span>
+    <span><i style="background:#10b981"></i>Tools</span>
+    <span><i style="background:#ec4899"></i>RAG</span>
+    <span><i style="background:#6366f1"></i>Memory</span>
+    <span><i style="background:#f59e0b"></i>LLM</span>
+  </div>
+</div>
+
+<table class="lt">
+  <thead><tr><th>Layer</th><th>Does</th><th>Never Does</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ld" style="background:#00d4ff"></span><span class="ln">API</span></td><td>HTTP boundary, schema validation</td><td>Business logic</td></tr>
+    <tr><td><span class="ld" style="background:#a78bfa"></span><span class="ln">Orchestration</span></td><td>Planning, routing, coordination</td><td>Reasoning</td></tr>
+    <tr><td><span class="ld" style="background:#10b981"></span><span class="ln">Tools</span></td><td>Deterministic computation</td><td>LLM calls</td></tr>
+    <tr><td><span class="ld" style="background:#ec4899"></span><span class="ln">Retrieval</span></td><td>Knowledge lookup, RAG</td><td>Computing answers</td></tr>
+    <tr><td><span class="ld" style="background:#6366f1"></span><span class="ln">Memory</span></td><td>Context management</td><td>Retrieval</td></tr>
+    <tr><td><span class="ld" style="background:#ef4444"></span><span class="ln">Guardrails</span></td><td>Enforcement at boundaries</td><td>Routing</td></tr>
+    <tr><td><span class="ld" style="background:#f59e0b"></span><span class="ln">LLM</span></td><td>Reasoning, language generation</td><td>Arithmetic</td></tr>
+    <tr><td><span class="ld" style="background:#94a3b8"></span><span class="ln">Observability</span></td><td>Tracing, logging, audit</td><td>Business logic</td></tr>
+    <tr><td><span class="ld" style="background:#64748b"></span><span class="ln">Evaluation</span></td><td>Quality measurement</td><td>Production traffic</td></tr>
+  </tbody>
+</table>
+
+<div class="sn2">03 — Platform Components</div>
+<h2>What Each Layer Actually Contains</h2>
+<div class="cg">
+  <div class="cc"><div class="ch"><div class="ci">⚡</div><div><div class="cn">API Layer</div><div class="cp">platform/api/</div></div></div><div class="cd">FastAPI entrypoint. Request validation and response shaping only — zero business logic lives here.</div><ul class="cl2"><li>POST /query — primary inference endpoint</li><li>GET /health, /ready — ops probes</li><li>Pydantic v2 schema enforcement</li><li>Request ID middleware for tracing</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🧠</div><div><div class="cn">Orchestration</div><div class="cp">platform/orchestration/</div></div></div><div class="cd">The coordinator — not the reasoner. Plans are deterministic code, not LLM delegation.</div><ul class="cl2"><li>QueryPlanner: keyword-based classification</li><li>QueryRouter: tool vs retrieval vs memory</li><li>Context assembly before LLM call</li><li>Parallel tool execution (roadmap)</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🔧</div><div><div class="cn">Tools Layer</div><div class="cp">platform/tools/</div></div></div><div class="cd">All deterministic computations. The LLM never does arithmetic — every number traces to a tool.</div><ul class="cl2"><li>data_summary — period aggregation</li><li>breakdown — categorical analysis</li><li>trend_comparison — delta + direction</li><li>anomaly_detector — z-score outliers</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🔍</div><div><div class="cn">Retrieval / RAG</div><div class="cp">platform/retrieval/</div></div></div><div class="cd">Domain knowledge with citation-friendly retrieval. Swap FAISS → Pinecone without touching orchestration.</div><ul class="cl2"><li>VectorStoreInterface abstraction</li><li>FAISS (dev) → Pinecone-ready</li><li>Chunking + metadata pipeline</li><li>Source attribution on every doc</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">💾</div><div><div class="cn">Memory Layer</div><div class="cp">platform/memory/</div></div></div><div class="cd">Two-tier architecture. Session context is ephemeral. User profile is persisted. Different lifecycles, different stores.</div><ul class="cl2"><li>SessionMemory — per-conversation</li><li>UserProfile — persistent (Redis)</li><li>Turn history with truncation policy</li><li>MemoryManager coordination layer</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🛡️</div><div><div class="cn">Guardrails</div><div class="cp">platform/guardrails/</div></div></div><div class="cd">Code-level enforcement at system boundaries. Runs regardless of what the LLM produces.</div><ul class="cl2"><li>PII detection (SSN, card, email)</li><li>Policy rule engine</li><li>Output schema validation</li><li>Number grounding check (roadmap)</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🤖</div><div><div class="cn">LLM Layer</div><div class="cp">platform/llm/</div></div></div><div class="cd">Model-agnostic gateway. LLM receives fully assembled grounded context — it reasons and writes only.</div><ul class="cl2"><li>OpenAI + Anthropic adapters</li><li>StubAdapter for dev/testing</li><li>PromptBuilder with versioned templates</li><li>Token usage logging</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">📊</div><div><div class="cn">Observability</div><div class="cp">platform/observability/</div></div></div><div class="cd">Structured JSON logging across every step. OpenTelemetry-ready. Full audit trail per request.</div><ul class="cl2"><li>structlog with JSON output</li><li>Correlation trace_id on all events</li><li>AuditEvent model for compliance</li><li>OTel endpoint configurable</li></ul></div>
+  <div class="cc"><div class="ch"><div class="ci">🧪</div><div><div class="cn">Evaluation</div><div class="cp">evals/</div></div></div><div class="cd">First-class evaluation framework. 4-tier scoring, prompt regression testing, hallucination tracking.</div><ul class="cl2"><li>BenchmarkCase schema (JSON)</li><li>Tool accuracy: exact match in CI</li><li>RAG: retrieval recall@k</li><li>LLM: faithfulness + groundedness</li></ul></div>
+</div>
+
+<div class="sn2">04 — Request Lifecycle</div>
+<h2>What Happens on Every Query</h2>
+<p style="font-size:14px;color:var(--muted);font-family:var(--mono);margin-bottom:20px;">Example: "How does my usage this month compare to last month?"</p>
+<div class="flow">
+  <div class="fs"><div class="fn">01</div><div><div class="ft">Request received</div><div class="fd">POST /api/v1/query. Middleware attaches trace_id. Pydantic validates schema.</div><span class="fb ba">api/</span></div></div>
+  <div class="fs"><div class="fn">02</div><div><div class="ft">Input guardrails</div><div class="fd">PII scan. Policy check for blocked intents. Blocks before any orchestration begins.</div><span class="fb bg">guardrails/input</span></div></div>
+  <div class="fs"><div class="fn">03</div><div><div class="ft">Query planning</div><div class="fd">Planner classifies: MIXED. Selects tools: [data_summary, trend_comparison]. Flags memory needed.</div><span class="fb bo">orchestration/planner</span></div></div>
+  <div class="fs"><div class="fn">04</div><div><div class="ft">Tool execution</div><div class="fd">data_summary(current_month) → exact totals. trend_comparison(current, prior) → delta + direction. Pure functions.</div><span class="fb bt">tools/</span></div></div>
+  <div class="fs"><div class="fn">05</div><div><div class="ft">Memory context loaded</div><div class="fd">User profile retrieved. Session history: last 10 turns. Context assembled deliberately, not blindly injected.</div><span class="fb bm">memory/</span></div></div>
+  <div class="fs"><div class="fn">06</div><div><div class="ft">Context assembly → LLM call</div><div class="fd">PromptBuilder assembles: system_prompt + tool_results + memory + query. LLM receives grounded facts. It writes — it does not compute.</div><span class="fb bl">llm/</span></div></div>
+  <div class="fs"><div class="fn">07</div><div><div class="ft">Output guardrails</div><div class="fd">Schema check: required fields present. Number grounding: values in response match tool output.</div><span class="fb bg">guardrails/output</span></div></div>
+  <div class="fs"><div class="fn">08</div><div><div class="ft">Observability + response</div><div class="fd">Full trace emitted: trace_id, tool calls, token usage, latency_ms. Response: {answer, structured_data, citations}.</div><span class="fb bx">observability/</span></div></div>
+</div>
+
+<div class="callout g"><div class="cl">Key insight</div><p>The LLM is step 6 out of 8 — not step 1. The orchestrator assembles everything before the LLM sees a single token. It receives fully grounded, fact-loaded context and writes language around it. It never retrieves, computes, or routes.</p></div>
+
+<div class="sn2">05 — Design Principles</div>
+<h2>The Decisions That Actually Matter</h2>
+<div class="pg">
+  <div class="pc"><div class="pn">01</div><div class="pt">LLM is a reasoning layer</div><div class="pd">It writes language. It never computes, retrieves, or plans. Every number traces to a deterministic tool call.</div></div>
+  <div class="pc"><div class="pn">02</div><div class="pt">Tools own the numbers</div><div class="pd">Tools are pure functions. Same input, same output always. Unit tested with exact assertions — zero tolerance.</div></div>
+  <div class="pc"><div class="pn">03</div><div class="pt">RAG over fine-tuning</div><div class="pd">Knowledge updates without retraining. Every claim has a citable source. Fine-tuning bakes knowledge in with no audit trail.</div></div>
+  <div class="pc"><div class="pn">04</div><div class="pt">Guardrails are code</div><div class="pd">Pydantic validators enforce constraints regardless of what the LLM produces. Prompt instructions are suggestions. Code is enforcement.</div></div>
+  <div class="pc"><div class="pn">05</div><div class="pt">Memory is not one thing</div><div class="pd">Session context ≠ user profile ≠ summarized history. Different lifecycles, different stores. Conflating them creates stale bugs.</div></div>
+  <div class="pc"><div class="pn">06</div><div class="pt">Prompts versioned like artifacts</div><div class="pd">Prompts live in versioned directories. Promotion requires eval suite pass. No prompt ships without data behind it.</div></div>
+  <div class="pc"><div class="pn">07</div><div class="pt">Evaluation from day one</div><div class="pd">4-tier scoring built into CI/CD. Hallucination rate is a tracked health metric — not an afterthought.</div></div>
+  <div class="pc"><div class="pn">08</div><div class="pt">Observability from day one</div><div class="pd">Every step emits a structured JSON event with trace_id, duration, and context. OTel-ready. You always know what happened.</div></div>
+  <div class="pc"><div class="pn">09</div><div class="pt">Architecture over feature bloat</div><div class="pd">The value is in interfaces, layering, and decision-making — not line count. Every choice has a documented rationale.</div></div>
+</div>
+
+<div class="sn2">06 — Why the LLM Never Does Arithmetic</div>
+<h2>Tools Layer Deep Dive</h2>
+<p>LLMs are probabilistic text predictors — not reliable calculators. A wrong number looks identical to a right one. No error, no exception, no warning. Every tool is a pure Python function: deterministic, side-effect-free, unit-testable with exact assertions.</p>
+<pre><code>def data_summary(
+    dataset: DataSet,
+    period: Optional[str] = None,
+) -> ToolResult:
+    """Pure function — same input always returns same output."""
+    records = dataset.records
+    if period:
+        year, month = map(int, period.split("-"))
+        records = [r for r in records
+                   if r.date.year == year and r.date.month == month]
+
+    total = sum((r.amount for r in records), Decimal("0"))
+    return ToolResult(
+        tool_name="data_summary",
+        success=True,
+        data={"total": str(_round(total)), "count": len(records)},
+    )</code></pre>
+<pre><code>def test_data_summary_monthly():
+    result = data_summary(sample_dataset, period="2024-01")
+    assert result.data["total"] == "1305.89"  # exact — zero tolerance</code></pre>
+
+<div class="sn2">07 — Enforcement at the Boundary</div>
+<h2>Guardrails as Code, Not Prompts</h2>
+<div class="callout"><div class="cl">Why not just add this to the system prompt?</div><p>"Always respond in JSON" in a system prompt is a request. A Pydantic model that raises <code>ValidationError</code> when required fields are missing is a guarantee. One can be bypassed by adversarial input. The other cannot.</p></div>
+<p>Guardrails run twice — on input before orchestration begins, and on output before the response reaches the user. Input covers PII detection (SSN, card numbers, phone via regex), policy rules, and schema validation. Output covers required fields, response length, and number cross-referencing against tool outputs.</p>
+
+<div class="sn2">08 — Evaluation Framework</div>
+<h2>Quality as a First-Class Engineering Concern</h2>
+<p>Most teams defer evaluation until "later." Later means never, and regressions are discovered when users report wrong answers.</p>
+<table class="lt">
+  <thead><tr><th>Tier</th><th>What</th><th>How</th><th>CI Gate</th></tr></thead>
+  <tbody>
+    <tr><td><span class="ln">1</span></td><td>Tool accuracy</td><td>pytest exact match</td><td>Every commit</td></tr>
+    <tr><td><span class="ln">2</span></td><td>Retrieval quality</td><td>recall@k on labeled dataset</td><td>Daily</td></tr>
+    <tr><td><span class="ln">3</span></td><td>LLM response quality</td><td>faithfulness + groundedness</td><td>Per prompt version</td></tr>
+    <tr><td><span class="ln">4</span></td><td>Prompt regression</td><td>A/B vs golden dataset</td><td>On version bump</td></tr>
+  </tbody>
+</table>
+
+<div class="sn2">09 — Architecture Decision Records</div>
+<h2>Every Major Decision Documented</h2>
+<div class="adrl">
+  <div class="adr"><div class="ah"><span class="an">ADR-001</span><span class="as">Accepted</span></div><div class="at">Use RAG over fine-tuning for domain knowledge</div><div class="ad">Domain knowledge changes frequently. RAG allows document updates without model retraining. Citations are first-class — every fact has a traceable source. Fine-tuning costs 10–100x more and produces knowledge that can't be audited or updated without a full retrain.</div></div>
+  <div class="adr"><div class="ah"><span class="an">ADR-002</span><span class="as">Accepted</span></div><div class="at">Deterministic tools for all data computations</div><div class="ad">LLMs are unreliable calculators. Tools are pure functions: deterministic, unit-testable, auditable. All computed values trace to tool outputs, enabling hallucination detection at the output guardrail layer.</div></div>
+  <div class="adr"><div class="ah"><span class="an">ADR-003</span><span class="as">Accepted</span></div><div class="at">Separate short-term and long-term memory</div><div class="ad">Session context is ephemeral and cheap — fast in-memory access. User profile is durable — Redis. Different lifecycles, different storage requirements. Conflating them creates stale context bugs and wasted tokens per request.</div></div>
+  <div class="adr"><div class="ah"><span class="an">ADR-004</span><span class="as">Accepted</span></div><div class="at">Guardrails as a separate architectural layer</div><div class="ad">Prompt-based safety is a suggestion, not enforcement. Code-level guardrails cannot be bypassed by user input. Separate layer means independent iteration, testing, and a clear audit trail — every blocked request logged with the specific rule triggered.</div></div>
+  <div class="adr"><div class="ah"><span class="an">ADR-005</span><span class="as">Accepted</span></div><div class="at">Evaluation as a first-class engineering concern</div><div class="ad">Teams that defer evaluation discover regressions in production. Four-tier framework from day one: deterministic CI gate, retrieval quality, LLM response quality, prompt regression. Hallucination rate is a tracked metric with an explicit target: below 2%.</div></div>
+</div>
+
+<div class="sn2">10 — Get the Code</div>
+<h2>Repository</h2>
+<p>Full repository on GitHub: 42 files across 9 platform layers, complete docs, 5 ADRs, runbook, eval benchmarks, Dockerfile, and docker-compose setup.</p>
+<p><a href="https://github.com/pradeep-kapa/layered-ai-agent-platform" target="_blank">→ github.com/pradeep-kapa/layered-ai-agent-platform ↗</a></p>
+<div class="callout g"><div class="cl">Where to start reading</div><p>Begin with <code>docs/decisions/</code> — the five ADRs explain every major architectural choice. Then <code>platform/orchestration/orchestrator.py</code> to see how layers wire together. Then <code>platform/tools/data_tools.py</code> to see the pure-function pattern that makes the whole system trustworthy.</p></div>
+
+</div>
+
+<footer>
+  <div class="fl">Pradeep Kapa · Senior Software Engineer · Cloud · SRE · AI Platforms</div>
+  <div class="fll">
+    <a href="https://pradeep-kapa.github.io">Portfolio</a>
+    <a href="https://www.linkedin.com/in/pradeepkapa" target="_blank">LinkedIn ↗</a>
+    <a href="https://github.com/pradeep-kapa" target="_blank">GitHub ↗</a>
+  </div>
+</footer>
+
+</body>
+</html>
